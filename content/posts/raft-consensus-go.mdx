@@ -1,0 +1,130 @@
+---
+title: "Raft Consensus in 500 Lines of Go"
+slug: "raft-consensus-go"
+date: "2026-09-10"
+description: "A walkthrough of implementing the Raft consensus algorithm from the original paper in idiomatic Go. Leader election, log replication, and safety properties explained with code."
+tags: ["go", "architecture"]
+published: true
+---
+
+# Raft Consensus in 500 Lines of Go
+
+Distributed consensus is one of those topics where reading papers feels very different from writing code. After reading the Raft paper three times, I decided the only way to actually understand it was to implement it.
+
+This post walks through the key parts of my implementation. The full source is on GitHub.
+
+<Callout type="note" title="Prerequisites">
+Familiarity with goroutines and channels is assumed. Some familiarity with the CAP theorem helps but isn't required.
+</Callout>
+
+## What Raft Solves
+
+Raft solves the **replicated state machine** problem: given N servers, ensure they all apply the same sequence of commands in the same order, even if up to ⌊N/2⌋ servers fail.
+
+The answer is a replicated log. All writes go through a single elected leader, which appends to its log and replicates to followers before acknowledging the client.
+
+## The Core Types
+
+```go
+type State int
+
+const (
+    Follower  State = iota
+    Candidate
+    Leader
+)
+
+type LogEntry struct {
+    Term    int
+    Command any
+}
+
+type Raft struct {
+    mu          sync.Mutex
+    peers       []*rpc.Client
+    state       State
+    currentTerm int
+    votedFor    int
+    log         []LogEntry
+    commitIndex int
+    lastApplied int
+
+    // Leader only
+    nextIndex  []int
+    matchIndex []int
+
+    electionTimer  *time.Timer
+    heartbeatTimer *time.Timer
+}
+```
+
+## Leader Election
+
+Each server starts as a Follower with a randomised election timeout between 150–300ms. If no heartbeat arrives from a leader before the timeout fires, the server transitions to Candidate and starts an election:
+
+```go
+func (r *Raft) startElection() {
+    r.mu.Lock()
+    r.state = Candidate
+    r.currentTerm++
+    r.votedFor = r.id
+    term := r.currentTerm
+    lastLogIndex := len(r.log) - 1
+    lastLogTerm := 0
+    if lastLogIndex >= 0 {
+        lastLogTerm = r.log[lastLogIndex].Term
+    }
+    r.mu.Unlock()
+
+    votes := int64(1) // self-vote
+    for _, peer := range r.peers {
+        go func(p *rpc.Client) {
+            args := RequestVoteArgs{term, r.id, lastLogIndex, lastLogTerm}
+            var reply RequestVoteReply
+            if err := p.Call("Raft.RequestVote", &args, &reply); err != nil {
+                return
+            }
+            if reply.VoteGranted {
+                if atomic.AddInt64(&votes, 1) > int64(len(r.peers)/2) {
+                    r.becomeLeader()
+                }
+            }
+        }(peer)
+    }
+}
+```
+
+The randomised timeout is the key insight: collisions are rare enough that one server almost always starts its election first and wins before others even begin.
+
+## Safety: The Voting Restriction
+
+Raft's safety guarantee rests on a single voting rule: **a voter only grants a vote if the candidate's log is at least as up-to-date as its own**. "Up-to-date" is defined by comparing the last log entry's term, then index:
+
+```go
+func (r *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) error {
+    r.mu.Lock()
+    defer r.mu.Unlock()
+
+    myLastTerm, myLastIndex := r.lastLogTermIndex()
+    logOk := args.LastLogTerm > myLastTerm ||
+        (args.LastLogTerm == myLastTerm && args.LastLogIndex >= myLastIndex)
+
+    if args.Term >= r.currentTerm && logOk && (r.votedFor == -1 || r.votedFor == args.CandidateId) {
+        r.votedFor = args.CandidateId
+        reply.VoteGranted = true
+    }
+    return nil
+}
+```
+
+This single check is what guarantees that a newly elected leader always has all committed entries.
+
+## What I Learned
+
+Implementing Raft taught me three things that the paper doesn't emphasise enough:
+
+1. **Mutex discipline is everything.** A single lock inversion breaks election safety in subtle, non-deterministic ways.
+2. **RPC timeout handling is hard.** An RPC that never returns is worse than one that returns an error.
+3. **Randomised timeouts are elegant.** The solution to a hard distributed coordination problem is just `rand.Intn(150) + 150` ms.
+
+The full implementation with log compaction, snapshots, and a test suite simulating network partitions is at [github.com/adityasingh/raft-kv](https://github.com/adityasingh/raft-kv).

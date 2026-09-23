@@ -1,0 +1,97 @@
+---
+title: "TypeScript Type Inference at the Limit: Variadic Tuple Types"
+slug: "typescript-variadic-tuples"
+date: "2026-09-01"
+description: "A deep dive into variadic tuple types and how they enable truly type-safe pipe(), compose(), and curried function signatures without any runtime overhead."
+tags: ["typescript"]
+published: true
+---
+
+# TypeScript Type Inference at the Limit: Variadic Tuple Types
+
+TypeScript 4.0 introduced variadic tuple types and they've been sitting quietly in the type system ever since, waiting for someone to do something interesting with them. This post is about exactly that.
+
+## The Problem: Typed `pipe()`
+
+The classic `pipe` function applies a sequence of functions left-to-right. The challenge is typing it so that:
+
+1. The output of function N must match the input of function N+1
+2. The overall return type is the output of the last function
+3. No `any` anywhere
+
+Here's what we're building toward:
+
+```ts
+const result = pipe(
+  (x: number) => x * 2,
+  (x: number) => x.toString(),
+  (x: string) => x.length,
+)
+
+result(5) // type: number ✓ (not any)
+```
+
+## Variadic Tuple Types
+
+Before variadic tuples, spreading types in a tuple position wasn't possible. Now it is:
+
+```ts
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U]
+
+type AB = Concat<[string, number], [boolean, Date]>
+// → [string, number, boolean, Date]
+```
+
+The `...T` spread works on generic tuple types, which unlocks building type-level pipelines.
+
+## Building the Type Machinery
+
+The key insight is representing a pipeline as a tuple of functions and then threading types through it:
+
+```ts
+type Fn = (arg: any) => any
+
+// Extract the input type of a function
+type Input<F extends Fn> = Parameters<F>[0]
+
+// Extract the output type of a function
+type Output<F extends Fn> = ReturnType<F>
+
+// Ensure each function's input matches the previous function's output
+type ValidPipeline<T extends Fn[], Acc = never> =
+  T extends [infer F extends Fn, ...infer Rest extends Fn[]]
+    ? [Acc] extends [never]
+      ? ValidPipeline<Rest, Output<F>>
+      : Input<F> extends Acc
+        ? ValidPipeline<Rest, Output<F>>
+        : never // type mismatch detected here
+    : T
+```
+
+<Callout type="warning" title="TypeScript recursion limits">
+TypeScript has a recursion depth limit for conditional types (~100). Real implementations use overloads for N up to a fixed limit (usually 9) to stay within bounds.
+</Callout>
+
+## The Final Implementation
+
+```ts
+function pipe<A extends Fn[]>(
+  ...fns: A & ValidPipeline<A>
+): (x: Input<A[0]>) => Output<A[number]> {
+  return (x) => fns.reduce((acc, fn) => fn(acc), x)
+}
+```
+
+The `& ValidPipeline<A>` intersection is the trick: if the pipeline is invalid (types don't chain correctly), `ValidPipeline<A>` resolves to `never`, which makes the intersection `never`, which gives you a compile-time error at the call site.
+
+## What This Teaches
+
+Variadic tuple types collapse a whole class of "you need to write N overloads" problems into a single generic. They're the mechanism behind:
+
+- `Promise.all<T extends unknown[]>(...args: T)` — typed tuple output
+- Typed Redux middleware chains
+- Type-safe dependency injection containers
+
+The limit is TypeScript's own recursion ceiling, but for most practical use cases — pipelines up to 10–15 functions — the pattern is fully viable.
+
+The full implementation with 20-arity overloads and tests lives at [github.com/adityasingh/typed-router](https://github.com/adityasingh/typed-router).

@@ -1,0 +1,264 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-mono: var(--font-mono), 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Industrial Dark Palette from Design Guide */
+  --color-background: #09090b;
+  --color-surface: #121215;
+  --color-surface-hover: #18181c;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-subtle: rgba(255, 255, 255, 0.04);
+  --color-primary-text: #ededee;
+  --color-muted-text: #8c8c93;
+
+  /* Backward compatibility for semantic tokens */
+  --color-foreground: #ededee;
+  --color-card: #121215;
+  --color-card-foreground: #ededee;
+  --color-muted: #18181c;
+  --color-muted-foreground: #8c8c93;
+  --color-primary: #8b5cf6;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #38bdf8;
+  --color-accent-foreground: #082f49;
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-danger: #ef4444;
+
+  /* Mathematical Bento Metrics (R/2 <= G <= R) */
+  --radius-bento: 1.25rem; /* 20px */
+  --radius: 0.5rem;
+  --radius-sm: 0.25rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --gap-bento: 1rem; /* 16px */
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    color-scheme: dark;
+    background-color: var(--color-background);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-primary-text);
+    font-family: var(--font-sans);
+    font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background-color: rgba(139, 92, 246, 0.25);
+    color: #ffffff;
+  }
+
+  /* Sleek Industrial Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #09090b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.24);
+  }
+}
+
+@layer utilities {
+  .gap-bento {
+    gap: 1rem;
+  }
+  .rounded-bento {
+    border-radius: 1.25rem;
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #ffffff 20%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-purple {
+    background: linear-gradient(135deg, #c084fc 0%, #38bdf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Mathematical Bento Aspect Utilities */
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 1rem;
+    max-width: 72rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  @media (min-width: 768px) {
+    .bento-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      grid-auto-rows: 140px;
+    }
+  }
+
+  /* Hardware-accelerated Spotlight Card Mask */
+  .spotlight-card {
+    position: relative;
+    border-radius: 1.25rem;
+    background-color: #121215;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .spotlight-card::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: radial-gradient(
+      450px circle at var(--mouse-x, -999px) var(--mouse-y, -999px),
+      rgba(255, 255, 255, 0.2),
+      transparent 40%
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .spotlight-card:hover::before {
+    opacity: 1;
+  }
+
+  /* Micro-tonal surface glow */
+  .spotlight-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    background: radial-gradient(
+      600px circle at var(--mouse-x, -999px) var(--mouse-y, -999px),
+      rgba(255, 255, 255, 0.04),
+      transparent 50%
+    );
+  }
+
+  .spotlight-card:hover .spotlight-glow {
+    opacity: 1;
+  }
+
+  /* Micro animations */
+  @keyframes pulseSubtle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.92); }
+  }
+
+  .animate-pulse-subtle {
+    animation: pulseSubtle 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+/* Editorial & MDX Typography Styling */
+.prose {
+  color: #ededee;
+  max-width: 100%;
+}
+
+.prose p {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.8;
+  color: #c4c4cc;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  color: #ededee;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  scroll-margin-top: 5rem;
+}
+
+.prose h1 { font-size: 2.25rem; margin-top: 0; margin-bottom: 1.5rem; }
+.prose h2 { font-size: 1.5rem; margin-top: 2.5rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; }
+.prose h3 { font-size: 1.25rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+
+.prose a {
+  color: #a78bfa;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  transition: color 0.15s ease;
+}
+.prose a:hover { color: #c4b5fd; }
+
+.prose strong { color: #ffffff; font-weight: 600; }
+
+.prose code:not(pre code) {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 0.15em 0.4em;
+  border-radius: 0.375rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+
+.prose pre {
+  margin: 1.5rem 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0d0d11 !important;
+  padding: 1.25rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.prose ul, .prose ol {
+  margin: 1.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.prose ul { list-style-type: disc; }
+.prose ol { list-style-type: decimal; }
+
+.prose li {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: #c4c4cc;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
